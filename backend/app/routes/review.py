@@ -1,36 +1,24 @@
-from urllib.parse import urlparse
+from fastapi import APIRouter, HTTPException
 
-from fastapi import APIRouter
-
-from app.models.review_models import ReviewRequest, ReviewResponse
-from app.services.ai_review_service import get_reviews, create_review
+from app.models.review_models import PRDetailsResponse, ReviewRequest, ReviewResponse
+from app.services.github_service import fetch_pr_details, parse_pr_url
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
 
-# @router.get("/", response_model=list[ReviewResponse])
-# def list_reviews():
-#     return get_reviews()
+@router.post("/fetch-pr-details", response_model=list[PRDetailsResponse])
+def get_pr_details(request: ReviewResponse):
+    try:
+        return fetch_pr_details(request)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 @router.post("/parse-pr", response_model=ReviewResponse)
 def parse_pr(request: ReviewRequest):
-    print(f"Received URL: {request.url}")
-
-    parsed = urlparse(request.url)
-    parts = parsed.path.strip("/").split("/")
-
-    if len(parts) < 4 or parts[2] != "pull":
-        raise ValueError("Invalid GitHub Pull Request URL")
-
-    owner = parts[0]
-    repo = parts[1]
-    pull_number = parts[3]
-
-    return {
-        "owner": owner,
-        "repo": repo,
-        "pull_number": pull_number
-    }
+    try:
+        return parse_pr_url(request.url)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     
 
 # @router.post("/", response_model=ReviewResponse)

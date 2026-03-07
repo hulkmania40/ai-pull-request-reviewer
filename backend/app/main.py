@@ -10,3 +10,5 @@ app.include_router(review_router)
 @app.get("/")
 def read_root():
     return {"message": "Hello, FastAPI!"}
+
+# uvicorn app.main:app --reload

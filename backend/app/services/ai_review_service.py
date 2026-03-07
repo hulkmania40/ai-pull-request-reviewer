@@ -1,6 +1,5 @@
 from app.models.review_models import ReviewRequest, ReviewResponse
 
-
 def get_reviews() -> list[ReviewResponse]:
     return [
         ReviewResponse(
