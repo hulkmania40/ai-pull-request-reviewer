@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 import httpx
 from dotenv import load_dotenv
 
-from app.models.review_models import PRDetailsResponse, ReviewResponse
+from app.models.review_models import PRDetailsCleanedResponse, PRDetailsResponse, ReviewResponse
 
 load_dotenv()
 
@@ -30,6 +30,41 @@ def fetch_pr_details(data: ReviewResponse) -> list[PRDetailsResponse]:
 
 	return [PRDetailsResponse(**item) for item in response.json()]
 
+def extract_relevant_diffs(pr_details: list[PRDetailsResponse]) -> list[PRDetailsCleanedResponse]:
+	cleaned_diffs: list[PRDetailsCleanedResponse] = []
+
+	for detail in pr_details:
+		cleaned_diffs.append(
+			PRDetailsCleanedResponse(
+				sha=detail.sha,
+				filename=detail.filename,
+				status=detail.status,
+				additions=detail.additions,
+				deletions=detail.deletions,
+				changes=detail.changes,
+				cleaned_patch=extract_relevant_diff(detail.patch),
+			)
+		)
+
+	return cleaned_diffs
+
+def extract_relevant_diff(patch: str | None) -> str:
+	if not patch:
+		return ""
+
+	useful_lines: list[str] = []
+
+	for line in patch.splitlines():
+		# Skip hunk metadata lines like: @@ -10,6 +10,7 @@
+		if line.startswith("@@"):
+			continue
+		# Keep only code additions/removals, not file headers.
+		if (line.startswith("+") and not line.startswith("+++")) or (
+			line.startswith("-") and not line.startswith("---")
+		):
+			useful_lines.append(line)
+
+	return "\n".join(useful_lines)
 
 def parse_pr_url(url: str) -> ReviewResponse:
 	parsed = urlparse(url)

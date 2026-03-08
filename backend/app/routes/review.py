@@ -1,15 +1,17 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models.review_models import PRDetailsResponse, ReviewRequest, ReviewResponse
-from app.services.github_service import fetch_pr_details, parse_pr_url
+from app.models.review_models import PRDetailsCleanedResponse, PRDetailsResponse, ReviewRequest, ReviewResponse
+from app.services.github_service import extract_relevant_diffs, fetch_pr_details, parse_pr_url
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
 
-@router.post("/fetch-pr-details", response_model=list[PRDetailsResponse])
+@router.post("/fetch-pr-details", response_model=list[PRDetailsCleanedResponse])
 def get_pr_details(request: ReviewResponse):
     try:
-        return fetch_pr_details(request)
+        processed_pr_details = fetch_pr_details(request)
+        extracted_relevant_diff = extract_relevant_diffs(processed_pr_details)
+        return extracted_relevant_diff
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 

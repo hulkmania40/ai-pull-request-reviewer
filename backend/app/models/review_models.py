@@ -21,3 +21,12 @@ class PRDetailsResponse(BaseModel):
     raw_url: str
     contents_url: str
     patch: Optional[str] = None
+
+class PRDetailsCleanedResponse(BaseModel):
+    sha: str
+    filename: str
+    status: str
+    additions: int
+    deletions: int
+    changes: int
+    cleaned_patch: str
