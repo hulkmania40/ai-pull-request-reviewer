@@ -10,6 +10,14 @@ class ReviewResponse(BaseModel):
     repo: str
     pull_number: str
 
+
+class ParsePRValidationResponse(BaseModel):
+    owner: str
+    repo: str
+    pull_number: str
+    is_valid_pr: bool
+    message: str
+
 class PRDetailsResponse(BaseModel):
     sha: str
     filename: str
@@ -32,6 +40,12 @@ class PRDetailsCleanedResponse(BaseModel):
     cleaned_patch: str
 
 
+class ReviewComment(BaseModel):
+    line: Optional[int] = None
+    severity: str
+    comment: str
+
+
 class FileReviewResult(BaseModel):
     file: str
-    comments: list[str]
+    comments: list[ReviewComment]

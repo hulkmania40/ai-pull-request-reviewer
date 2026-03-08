@@ -78,3 +78,17 @@ def parse_pr_url(url: str) -> ReviewResponse:
 		repo=parts[1],
 		pull_number=parts[3],
 	)
+
+
+def is_valid_pull_request(data: ReviewResponse) -> bool:
+	url = f"https://api.github.com/repos/{data.owner}/{data.repo}/pulls/{data.pull_number}"
+
+	try:
+		response = client.get(url)
+		if response.status_code == 404:
+			return False
+		response.raise_for_status()
+	except httpx.HTTPError as exc:
+		raise RuntimeError("Failed to validate pull request with GitHub") from exc
+
+	return True
