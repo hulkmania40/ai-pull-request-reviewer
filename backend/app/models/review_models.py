@@ -30,3 +30,8 @@ class PRDetailsCleanedResponse(BaseModel):
     deletions: int
     changes: int
     cleaned_patch: str
+
+
+class FileReviewResult(BaseModel):
+    file: str
+    comments: list[str]
