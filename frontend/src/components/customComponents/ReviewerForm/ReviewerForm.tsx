@@ -112,7 +112,7 @@ const ReviewerForm = () => {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-border bg-linear-to-br from-background via-background to-emerald-50/30 p-5 shadow-sm dark:to-emerald-950/20">
+      <section className="rounded-2xl border border-border bg-linear-to-br from-background via-background to-emerald-50/30 p-4 shadow-sm sm:p-5 dark:to-emerald-950/20">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -136,8 +136,8 @@ const ReviewerForm = () => {
           </Button>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Field>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <Field className="w-full min-w-0 md:flex-1">
             <FieldLabel htmlFor="input-field-pr-url">
               Pull Request URL
             </FieldLabel>
@@ -163,7 +163,7 @@ const ReviewerForm = () => {
           <Button
             type="button"
             variant={isStep1Active ? "default" : "secondary"}
-            className={`self-start sm:mt-6 ${!validatedPr ? "ring-2 ring-emerald-300/60 dark:ring-emerald-500/40" : ""}`}
+            className={`w-full md:mt-6 md:w-auto md:self-start ${!validatedPr ? "ring-2 ring-emerald-300/60 dark:ring-emerald-500/40" : ""}`}
             onClick={() => {
               setIsValidating(true)
               setReviewResults(null)
@@ -186,7 +186,7 @@ const ReviewerForm = () => {
           <Button
             type="button"
             variant={isStep2Active ? "default" : "secondary"}
-            className={`self-start sm:mt-6 ${validatedPr?.is_valid_pr && !isReviewComplete ? "ring-2 ring-emerald-300/60 dark:ring-emerald-500/40" : ""}`}
+            className={`w-full md:mt-6 md:w-auto md:self-start ${validatedPr?.is_valid_pr && !isReviewComplete ? "ring-2 ring-emerald-300/60 dark:ring-emerald-500/40" : ""}`}
             onClick={() => {
               if (!validatedPr) {
                 return

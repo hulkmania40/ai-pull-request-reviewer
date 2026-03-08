@@ -3,9 +3,9 @@ import ReviewerForm from "./components/customComponents/ReviewerForm/ReviewerFor
 
 export function App() {
   return (
-    <div className="min-h-svh w-6xl mx-auto">
+    <div className="mx-auto min-h-svh w-full max-w-6xl px-4 sm:px-6">
       <Navbar />
-      <main className="p-6">
+      <main className="py-4 sm:py-6">
         <ReviewerForm />
       </main>
     </div>
