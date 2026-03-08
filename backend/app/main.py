@@ -6,6 +6,8 @@ from app.routes.review import router as review_router
 app = FastAPI()
 
 origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "https://ai-pull-request-reviewer.onrender.com"
 ]
 

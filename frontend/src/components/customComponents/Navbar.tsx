@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { useTheme } from "@/components/theme-provider"
-import { Moon, Sun } from "lucide-react"
+import { Bot, Moon, Sun } from "lucide-react"
 
 const Navbar = () => {
   const { theme, setTheme } = useTheme()
@@ -16,7 +16,7 @@ const Navbar = () => {
 
   return (
     <nav className="flex items-center justify-between border-b px-6 py-4">
-        <h1 className="text-lg font-semibold">AI Pull Request Reviewer</h1>
+        <h1 className="flex items-center text-lg font-semibold"><Bot className="mr-2" />AI Pull Request Reviewer</h1>
 
         <Button
           type="button"
