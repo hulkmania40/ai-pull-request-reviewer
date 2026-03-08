@@ -1,5 +1,5 @@
 import Navbar from "./components/customComponents/Navbar"
-import ReviewerForm from "./components/customComponents/ReviewerForm"
+import ReviewerForm from "./components/customComponents/ReviewerForm/ReviewerForm"
 
 export function App() {
   return (

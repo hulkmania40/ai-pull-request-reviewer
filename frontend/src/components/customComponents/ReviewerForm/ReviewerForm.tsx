@@ -5,11 +5,17 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { _post } from "@/lib/apiClient"
+import {
+  getSeverityClass,
+  getSeverityCounts,
+  getSeverityIconType,
+} from "./ReviewerForm.helpers"
 
 import { toast } from "sonner"
 
 import {
   AlertTriangle,
+  Bug,
   Bot,
   Check,
   FileCode2,
@@ -97,26 +103,9 @@ const ReviewerForm = () => {
     setReviewResults(null)
   }
 
-  const getSeverityClass = (severity: string) => {
-    if (severity === "error") {
-      return "border-red-200 bg-red-100 text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300"
-    }
-
-    if (severity === "warning") {
-      return "border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300"
-    }
-
-    return "border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300"
-  }
-
   const allComments = reviewResults?.flatMap((item) => item.comments) ?? []
-  const errorCount = allComments.filter(
-    (item) => item.severity === "error"
-  ).length
-  const warningCount = allComments.filter(
-    (item) => item.severity === "warning"
-  ).length
-  const infoCount = allComments.length - errorCount - warningCount
+  const { errorCount, warningCount, bugCount, infoCount } =
+    getSeverityCounts(allComments)
   const isStep1Active = !validatedPr
   const isStep2Active = !!validatedPr && !isReviewComplete
   const isStep3Active = isReviewComplete
@@ -276,6 +265,9 @@ const ReviewerForm = () => {
               <span className="rounded-full border border-amber-200 bg-amber-100 px-3 py-1 text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
                 Warnings: {warningCount}
               </span>
+              <span className="rounded-full border border-fuchsia-200 bg-fuchsia-100 px-3 py-1 text-fuchsia-700 dark:border-fuchsia-900/50 dark:bg-fuchsia-950/40 dark:text-fuchsia-300">
+                Bugs: {bugCount}
+              </span>
               <span className="rounded-full border border-blue-200 bg-blue-100 px-3 py-1 text-blue-700 dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300">
                 Info: {infoCount}
               </span>
@@ -301,32 +293,39 @@ const ReviewerForm = () => {
                   </p>
                 ) : (
                   <div className="mt-3 space-y-2">
-                    {fileResult.comments.map((item, idx) => (
-                      <div
-                        key={`${fileResult.file}-${idx}`}
-                        className="rounded-lg border border-border bg-card p-3"
-                      >
-                        <div className="mb-2 flex items-center gap-2 text-xs font-medium">
-                          <span
-                            className={`rounded border px-2 py-0.5 ${getSeverityClass(item.severity)}`}
-                          >
-                            {item.severity.toUpperCase()}
-                          </span>
-                          <span className="text-muted-foreground">
-                            Line: {item.line}
-                          </span>
-                          {item.severity === "error" && (
-                            <XCircle className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
-                          )}
-                          {item.severity === "warning" && (
-                            <AlertTriangle className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-                          )}
+                    {fileResult.comments.map((item, idx) => {
+                      const severityIconType = getSeverityIconType(item.severity)
+
+                      return (
+                        <div
+                          key={`${fileResult.file}-${idx}`}
+                          className="rounded-lg border border-border bg-card p-3"
+                        >
+                          <div className="mb-2 flex items-center gap-2 text-xs font-medium">
+                            <span
+                              className={`rounded border px-2 py-0.5 ${getSeverityClass(item.severity)}`}
+                            >
+                              {item.severity.toUpperCase()}
+                            </span>
+                            <span className="text-muted-foreground">
+                              Line: {item.line}
+                            </span>
+                            {severityIconType === "error" && (
+                              <XCircle className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
+                            )}
+                            {severityIconType === "warning" && (
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+                            )}
+                            {severityIconType === "bug" && (
+                              <Bug className="h-3.5 w-3.5 text-fuchsia-500 dark:text-fuchsia-400" />
+                            )}
+                          </div>
+                          <p className="text-sm text-foreground/90">
+                            {item.comment}
+                          </p>
                         </div>
-                        <p className="text-sm text-foreground/90">
-                          {item.comment}
-                        </p>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )}
               </article>
