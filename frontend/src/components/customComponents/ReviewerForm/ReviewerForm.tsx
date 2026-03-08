@@ -120,7 +120,7 @@ const ReviewerForm = () => {
               Pull Request Reviewer
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Validate once, then run AI review.
+              Validate the Pull Request once, then run AI review. <span className="text-xs">(*Works only on public repos)</span>
             </p>
           </div>
 
