@@ -6,7 +6,7 @@ from app.routes.review import router as review_router
 app = FastAPI()
 
 origins = [
-    "https://ai-pull-request-reviewer.onrender.com/"
+    "https://ai-pull-request-reviewer.onrender.com"
 ]
 
 app.add_middleware(
