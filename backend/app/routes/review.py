@@ -22,17 +22,14 @@ def parse_pr(request: ReviewRequest):
                 message="PR URL parsed successfully and pull request exists on GitHub.",
             )
 
-        return ParsePRValidationResponse(
-            owner=parsed.owner,
-            repo=parsed.repo,
-            pull_number=parsed.pull_number,
-            is_valid_pr=False,
+        raise HTTPException(
+            status_code=404,
             message="PR URL parsed successfully but pull request was not found on GitHub.",
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, message=str(exc)) from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, message=str(exc)) from exc
 
 @router.post("/run", response_model=list[FileReviewResult])
 def run_review(request: ReviewResponse):
@@ -41,4 +38,4 @@ def run_review(request: ReviewResponse):
         cleaned_files = extract_relevant_diffs(files)
         return review_files_individually(cleaned_files)
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, message=str(exc)) from exc
