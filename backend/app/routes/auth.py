@@ -8,6 +8,7 @@ from app.services.auth_service import (
     exchange_code_for_user_and_session,
     get_frontend_redirect_base_url,
     get_user_by_session_token,
+    register_user_service,
     verify_github_oauth_state,
 )
 from app.models.auth_models import userDetailsPayload
@@ -92,5 +93,9 @@ def auth_logout(authorization: str | None = Header(default=None)):
 
 @router.post("/register")
 def auth_register(userDetails: userDetailsPayload):
-    print("*"*50)
-    print(userDetails)
+    try:
+        return register_user_service(userDetails)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc

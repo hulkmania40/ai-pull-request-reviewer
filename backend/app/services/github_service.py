@@ -1,4 +1,5 @@
 import os
+from functools import wraps
 from urllib.parse import urlparse
 
 import httpx
@@ -19,14 +20,23 @@ if GITHUB_TOKEN:
 client = httpx.Client(headers=headers, timeout=10)
 
 
+def _github_http_error(message: str):
+	def deco(fn):
+		@wraps(fn)
+		def wrapper(*args, **kwargs):
+			try:
+				return fn(*args, **kwargs)
+			except httpx.HTTPError as exc:
+				raise RuntimeError(message) from exc
+		return wrapper
+	return deco
+
+
+@_github_http_error("Failed to fetch PR details from GitHub")
 def fetch_pr_details(data: ReviewResponse) -> list[PRDetailsResponse]:
 	url = f"https://api.github.com/repos/{data.owner}/{data.repo}/pulls/{data.pull_number}/files"
-
-	try:
-		response = client.get(url)
-		response.raise_for_status()
-	except httpx.HTTPError as exc:
-		raise RuntimeError("Failed to fetch PR details from GitHub") from exc
+	response = client.get(url)
+	response.raise_for_status()
 
 	return [PRDetailsResponse(**item) for item in response.json()]
 
@@ -80,15 +90,12 @@ def parse_pr_url(url: str) -> ReviewResponse:
 	)
 
 
+@_github_http_error("Failed to validate pull request with GitHub")
 def is_valid_pull_request(data: ReviewResponse) -> bool:
 	url = f"https://api.github.com/repos/{data.owner}/{data.repo}/pulls/{data.pull_number}"
-
-	try:
-		response = client.get(url)
-		if response.status_code == 404:
-			return False
-		response.raise_for_status()
-	except httpx.HTTPError as exc:
-		raise RuntimeError("Failed to validate pull request with GitHub") from exc
+	response = client.get(url)
+	if response.status_code == 404:
+		return False
+	response.raise_for_status()
 
 	return True

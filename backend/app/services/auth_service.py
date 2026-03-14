@@ -9,7 +9,8 @@ import httpx
 from dotenv import load_dotenv
 
 from app.models.auth_models import AuthUser
-from app.services.db_service import get_db_connection
+from app.services.security_service import hash_password
+from app.services.db_utils import execute, fetch_one, map_db_errors, with_connection, with_transaction
 
 load_dotenv()
 
@@ -173,81 +174,7 @@ def _fetch_primary_email(access_token: str) -> str | None:
     return str(any_verified.get("email")) if any_verified else None
 
 
-def _ensure_auth_tables() -> None:
-    with get_db_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS app_users (
-                    id SERIAL PRIMARY KEY,
-                    github_id BIGINT UNIQUE NOT NULL,
-                    login TEXT UNIQUE NOT NULL,
-                    name TEXT,
-                    email TEXT,
-                    avatar_url TEXT,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                );
-                """
-            )
-            cursor.execute(
-                """
-                CREATE TABLE IF NOT EXISTS app_sessions (
-                    token TEXT PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
-                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    expires_at TIMESTAMPTZ NOT NULL
-                );
-                """
-            )
-            cursor.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_app_sessions_user_id
-                ON app_sessions(user_id);
-                """
-            )
-        connection.commit()
-
-
-def upsert_github_user(github_user: dict, access_token: str) -> AuthUser:
-    _ensure_auth_tables()
-
-    github_id = github_user.get("id")
-    login = github_user.get("login")
-    if not github_id or not login:
-        raise RuntimeError("GitHub user payload is missing required fields")
-
-    email = github_user.get("email") or _fetch_primary_email(access_token)
-
-    with get_db_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO app_users (github_id, login, name, email, avatar_url)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (github_id) DO UPDATE
-                SET
-                    login = EXCLUDED.login,
-                    name = EXCLUDED.name,
-                    email = EXCLUDED.email,
-                    avatar_url = EXCLUDED.avatar_url,
-                    updated_at = NOW()
-                RETURNING id, github_id, login, name, email, avatar_url, created_at, updated_at;
-                """,
-                (
-                    int(github_id),
-                    str(login),
-                    github_user.get("name"),
-                    email,
-                    github_user.get("avatar_url"),
-                ),
-            )
-            row = cursor.fetchone()
-        connection.commit()
-
-    if not row:
-        raise RuntimeError("Failed to upsert authenticated user")
-
+def _row_to_auth_user(row: tuple) -> AuthUser:
     return AuthUser(
         id=row[0],
         github_id=row[1],
@@ -255,29 +182,75 @@ def upsert_github_user(github_user: dict, access_token: str) -> AuthUser:
         name=row[3],
         email=row[4],
         avatar_url=row[5],
-        created_at=row[6],
-        updated_at=row[7],
+        auth_provider=row[6],
+        email_verified=row[7],
+        created_at=row[8],
+        updated_at=row[9],
     )
 
 
-def create_user_session(user_id: int) -> str:
-    _ensure_auth_tables()
+@with_transaction
+@map_db_errors()
+def upsert_github_user(github_user: dict, access_token: str, *, connection) -> AuthUser:
+    github_id = github_user.get("id")
+    login = github_user.get("login")
+    if not github_id or not login:
+        raise RuntimeError("GitHub user payload is missing required fields")
 
+    email = github_user.get("email") or _fetch_primary_email(access_token)
+    email_verified = bool(email)
+
+    row = fetch_one(
+        connection,
+        """
+        INSERT INTO app_users (github_id, login, name, email, avatar_url, auth_provider, email_verified)
+        VALUES (%s, %s, %s, %s, %s, 'github', %s)
+        ON CONFLICT (github_id) DO UPDATE
+        SET
+            login = EXCLUDED.login,
+            name = EXCLUDED.name,
+            email = EXCLUDED.email,
+            avatar_url = EXCLUDED.avatar_url,
+            auth_provider = EXCLUDED.auth_provider,
+            email_verified = EXCLUDED.email_verified,
+            updated_at = NOW()
+        RETURNING id, github_id, login, name, email, avatar_url, auth_provider, email_verified, created_at, updated_at;
+        """,
+        (
+            int(github_id),
+            str(login),
+            github_user.get("name"),
+            email,
+            github_user.get("avatar_url"),
+            email_verified,
+        ),
+    )
+
+    if not row:
+        raise RuntimeError("Failed to upsert authenticated user")
+
+    return _row_to_auth_user(row)
+
+
+def create_user_session(user_id: int) -> str:
     token = secrets.token_urlsafe(48)
     expires_at = datetime.now(timezone.utc) + timedelta(days=SESSION_DAYS)
 
-    with get_db_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                INSERT INTO app_sessions (token, user_id, expires_at)
-                VALUES (%s, %s, %s);
-                """,
-                (token, user_id, expires_at),
-            )
-        connection.commit()
+    _create_user_session(token, user_id, expires_at)
 
     return token
+
+
+@with_transaction
+def _create_user_session(token: str, user_id: int, expires_at: datetime, *, connection) -> None:
+    execute(
+        connection,
+        """
+        INSERT INTO app_sessions (token, user_id, expires_at)
+        VALUES (%s, %s, %s);
+        """,
+        (token, user_id, expires_at),
+    )
 
 
 def exchange_code_for_user_and_session(code: str) -> tuple[AuthUser, str]:
@@ -288,45 +261,45 @@ def exchange_code_for_user_and_session(code: str) -> tuple[AuthUser, str]:
     return user, session_token
 
 
-def get_user_by_session_token(token: str) -> AuthUser | None:
-    _ensure_auth_tables()
-
-    with get_db_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT u.id, u.github_id, u.login, u.name, u.email, u.avatar_url, u.created_at, u.updated_at
-                FROM app_sessions s
-                JOIN app_users u ON u.id = s.user_id
-                WHERE s.token = %s AND s.expires_at > NOW();
-                """,
-                (token,),
-            )
-            row = cursor.fetchone()
+@with_connection
+def get_user_by_session_token(token: str, *, connection) -> AuthUser | None:
+    row = fetch_one(
+        connection,
+        """
+        SELECT u.id, u.github_id, u.login, u.name, u.email, u.avatar_url, u.auth_provider, u.email_verified, u.created_at, u.updated_at
+        FROM app_sessions s
+        JOIN app_users u ON u.id = s.user_id
+        WHERE s.token = %s AND s.expires_at > NOW();
+        """,
+        (token,),
+    )
 
     if not row:
         return None
 
-    return AuthUser(
-        id=row[0],
-        github_id=row[1],
-        login=row[2],
-        name=row[3],
-        email=row[4],
-        avatar_url=row[5],
-        created_at=row[6],
-        updated_at=row[7],
-    )
+    return _row_to_auth_user(row)
 
 
-def delete_session_token(token: str) -> None:
-    _ensure_auth_tables()
-
-    with get_db_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute("DELETE FROM app_sessions WHERE token = %s;", (token,))
-        connection.commit()
+@with_transaction
+def delete_session_token(token: str, *, connection) -> None:
+    execute(connection, "DELETE FROM app_sessions WHERE token = %s;", (token,))
 
 
 def get_frontend_redirect_base_url() -> str:
     return os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+@with_transaction
+@map_db_errors({"idx_app_users_email_unique": "Email is already registered"})
+def register_user_service(payload, *, connection) -> AuthUser:
+    row = fetch_one(
+        connection,
+        """
+        INSERT INTO app_users (email, password_hash, auth_provider, email_verified)
+        VALUES (%s, %s, 'local', FALSE)
+        RETURNING id, github_id, login, name, email, avatar_url, auth_provider, email_verified, created_at, updated_at;
+        """,
+        (payload.email, hash_password(payload.password)),
+    )
+    if not row:
+        raise RuntimeError("Failed to register user")
+    return _row_to_auth_user(row)
