@@ -189,6 +189,14 @@ def _row_to_auth_user(row: tuple) -> AuthUser:
     )
 
 
+def _build_local_identity(email: str) -> tuple[int, str]:
+    digest = hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
+    # Keep local identities in a negative numeric range to avoid GitHub ID overlap.
+    local_github_id = -int(digest[:15], 16)
+    local_login = f"local_{digest[:16]}"
+    return local_github_id, local_login
+
+
 @with_transaction
 @map_db_errors()
 def upsert_github_user(github_user: dict, access_token: str, *, connection) -> AuthUser:
@@ -289,16 +297,28 @@ def get_frontend_redirect_base_url() -> str:
     return os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 @with_transaction
-@map_db_errors({"idx_app_users_email_unique": "Email is already registered"})
+@map_db_errors(
+    {
+        "idx_app_users_email_unique": "Email is already registered",
+        "app_users_login_key": "Email is already registered",
+    }
+)
 def register_user_service(payload, *, connection) -> AuthUser:
+    local_github_id, local_login = _build_local_identity(payload.email)
+
     row = fetch_one(
         connection,
         """
-        INSERT INTO app_users (email, password_hash, auth_provider, email_verified)
-        VALUES (%s, %s, 'local', FALSE)
+        INSERT INTO app_users (github_id, login, email, password_hash, auth_provider, email_verified)
+        VALUES (%s, %s, %s, %s, 'local', FALSE)
         RETURNING id, github_id, login, name, email, avatar_url, auth_provider, email_verified, created_at, updated_at;
         """,
-        (payload.email, hash_password(payload.password)),
+        (
+            local_github_id,
+            local_login,
+            payload.email,
+            hash_password(payload.password),
+        ),
     )
     if not row:
         raise RuntimeError("Failed to register user")
