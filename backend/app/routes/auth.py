@@ -10,6 +10,7 @@ from app.services.auth_service import (
     get_user_by_session_token,
     verify_github_oauth_state,
 )
+from app.models.auth_models import userDetailsPayload
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -88,3 +89,8 @@ def auth_logout(authorization: str | None = Header(default=None)):
     token = _extract_bearer_token(authorization)
     delete_session_token(token)
     return Response(status_code=204)
+
+@router.post("/register")
+def auth_register(userDetails: userDetailsPayload):
+    print("*"*50)
+    print(userDetails)

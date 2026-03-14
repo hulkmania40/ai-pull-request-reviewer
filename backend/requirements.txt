@@ -6,3 +6,8 @@ python-dotenv
 openai
 python-dotenv
 psycopg2
+
+# auth
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
