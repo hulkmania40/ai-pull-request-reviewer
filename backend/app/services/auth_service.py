@@ -301,7 +301,8 @@ def get_frontend_redirect_base_url() -> str:
     {
         "idx_app_users_email_unique": "Email is already registered",
         "app_users_login_key": "Email is already registered",
-    }
+    },
+    unique_default_message="Email is already registered",
 )
 def register_user_service(payload, *, connection) -> AuthUser:
     local_github_id, local_login = _build_local_identity(payload.email)

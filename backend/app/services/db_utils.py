@@ -25,7 +25,10 @@ def with_connection(fn):
             return fn(*args, connection=connection, **kwargs)
     return wrapper
 
-def map_db_errors(unique_messages: dict[str, str] | None = None):
+def map_db_errors(
+    unique_messages: dict[str, str] | None = None,
+    unique_default_message: str = "Unique constraint violation",
+):
     unique_messages = unique_messages or {}
 
     def deco(fn):
@@ -41,7 +44,7 @@ def map_db_errors(unique_messages: dict[str, str] | None = None):
                 if code == errorcodes.UNIQUE_VIOLATION:
                     if constraint and constraint in unique_messages:
                         raise ValueError(unique_messages[constraint]) from exc
-                    raise ValueError("Unique constraint violation") from exc
+                    raise ValueError(unique_default_message) from exc
                 raise
         return wrapper
     return deco
