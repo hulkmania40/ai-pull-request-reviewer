@@ -8,6 +8,6 @@ python-dotenv
 psycopg2
 
 # auth
-passlib[bcrypt]
+passlib[argon2]
 python-jose[cryptography]
 python-multipart
